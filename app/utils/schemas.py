@@ -17,3 +17,14 @@ class User(BaseModel):
     id: int
     email: str
     username: str
+
+
+class LoginResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+
+
+class LoginData(BaseModel):
+    username: str
+    password: str
+

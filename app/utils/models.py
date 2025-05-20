@@ -18,6 +18,7 @@ class User(Base):
         'Chat',
         back_populates='admin',
         foreign_keys='Chat.admin_id')
+    chats = relationship('RelUsersToChat', back_populates='user')
 
 
 class Album(Base):
@@ -60,6 +61,7 @@ class Chat(Base):
 
     admin = relationship('User', back_populates='chats_admin')
     messages = relationship('Message', back_populates='chat')
+    users = relationship('RelUsersToChat', back_populates='chat')
 
 
 class Message(Base):
@@ -74,3 +76,12 @@ class Message(Base):
     chat = relationship('Chat', back_populates='messages')
     sender = relationship('User', back_populates='messages')
     album = relationship('Album', back_populates='messages')
+
+
+class RelUsersToChat(Base):
+    __tablename__ = 'rel_users_to_chat'
+    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    chat_id = Column(BigInteger, ForeignKey('chats.id'), primary_key=True)
+
+    user = relationship('User', back_populates='chats')
+    chat = relationship('Chat', back_populates='users')

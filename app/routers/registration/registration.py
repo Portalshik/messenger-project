@@ -5,7 +5,7 @@ from fastapi.routing import APIRouter
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.db import get_db
 from utils.models import User
-from utils._crypt import hash_password, generate_token
+from utils._crypt import hash_password
 import utils.models as models
 registration_router = APIRouter()
 
@@ -39,4 +39,4 @@ async def register(
     await db.commit()
     await db.refresh(user)
 
-    return generate_token(user.id)
+    return {"message": "User registered successfully"}
