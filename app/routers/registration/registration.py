@@ -7,10 +7,10 @@ from utils.db import get_db
 from utils.models import User
 from utils._crypt import hash_password
 import utils.models as models
+
 registration_router = APIRouter()
 
-
-@registration_router.post('/register')
+@registration_router.post('')
 async def register(
         request: Request,
         regData: RegistrationRequest,

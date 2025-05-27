@@ -1,4 +1,6 @@
 from pydantic import BaseModel
+from datetime import datetime
+from typing import Optional, List
 
 
 class LoginRequest(BaseModel):
@@ -27,4 +29,73 @@ class LoginResponse(BaseModel):
 class LoginData(BaseModel):
     username: str
     password: str
+
+
+# Схемы для чатов
+class ChatBase(BaseModel):
+    name: Optional[str] = None
+    is_group: bool = False
+
+
+class ChatCreate(ChatBase):
+    pass
+
+
+class ChatResponse(ChatBase):
+    id: int
+    admin_id: int
+
+    class Config:
+        from_attributes = True
+
+
+# Схемы для сообщений
+class MessageBase(BaseModel):
+    content: str
+    chat_id: int
+    album_id: Optional[int] = None
+
+
+class MessageCreate(MessageBase):
+    pass
+
+
+class MessageResponse(MessageBase):
+    id: int
+    sender_id: int
+    sended_at: datetime
+    media_path: Optional[str] = None
+    sender_name: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Схемы для медиа
+class MediaBase(BaseModel):
+    filename: str
+    filetype_id: int
+    album_id: Optional[int] = None
+
+
+class MediaCreate(MediaBase):
+    pass
+
+
+class MediaResponse(MediaBase):
+    id: int
+    path: str
+    uploaded_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AlbumSchema(BaseModel):
+    id: int
+    owner_id: int
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
 

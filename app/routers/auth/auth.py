@@ -7,6 +7,7 @@ from utils.models import User
 from utils.schemas import LoginData, LoginResponse
 from utils._crypt import verify_password, generate_access_token, generate_refresh_token, verify_token_type, decode_token
 import jwt
+from utils.auth import get_current_user
 
 auth_router = APIRouter()
 
@@ -71,3 +72,8 @@ async def refresh_token(
         
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Неверный refresh token")
+
+
+@auth_router.get('/me')
+async def get_me(current_user: User = Depends(get_current_user)):
+    return current_user
