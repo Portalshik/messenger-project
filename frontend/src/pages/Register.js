@@ -15,7 +15,7 @@ function Register() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const { register, login } = useAuth();
   const navigate = useNavigate();
@@ -30,7 +30,7 @@ function Register() {
     }
 
     try {
-      await register(username, password, confirmPassword, fullName);
+      await register(username, password, confirmPassword, email);
       await login(username, password);
       navigate('/chat');
     } catch (err) {
@@ -86,12 +86,12 @@ function Register() {
               margin="normal"
               required
               fullWidth
-              name="fullName"
-              label="Полное имя"
-              id="fullName"
-              autoComplete="name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+              name="email"
+              label="Email"
+              id="email"
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
             <TextField
               margin="normal"

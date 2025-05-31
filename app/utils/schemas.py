@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Optional, List
 
@@ -12,7 +12,7 @@ class RegistrationRequest(BaseModel):
     password: str
     confirm_password: str
     username: str
-    full_name: str
+    email: str
 
 
 class User(BaseModel):
@@ -66,6 +66,7 @@ class MessageResponse(MessageBase):
     sended_at: datetime
     media_path: Optional[str] = None
     sender_name: Optional[str] = None
+    media_paths: Optional[List[str]] = []
 
     class Config:
         from_attributes = True
@@ -99,3 +100,18 @@ class AlbumSchema(BaseModel):
     class Config:
         orm_mode = True
 
+
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    active: bool
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None

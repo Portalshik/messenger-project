@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Box,
   Paper,
@@ -17,14 +17,18 @@ import {
   DialogContent,
   DialogActions,
   Checkbox,
+  Fade,
+  Badge,
+  Tooltip,
 } from '@mui/material';
 import {
   Send as SendIcon,
   AttachFile as AttachFileIcon,
   Add as AddIcon,
   PersonAdd as PersonAddIcon,
+  Image as ImageIcon,
+  Group as GroupIcon,
 } from '@mui/icons-material';
-import { io } from 'socket.io-client';
 import axios from 'axios';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -33,7 +37,6 @@ function Chat() {
   const [selectedChat, setSelectedChat] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  const [socket, setSocket] = useState(null);
   const [openNewChat, setOpenNewChat] = useState(false);
   const [newChatName, setNewChatName] = useState('');
   const [isGroup, setIsGroup] = useState(false);
@@ -48,32 +51,42 @@ function Chat() {
   const [newChatUserResults, setNewChatUserResults] = useState([]);
   const [newChatSelectedUser, setNewChatSelectedUser] = useState(null);
 
-  useEffect(() => {
-    // Загружаем список чатов
-    loadChats();
+  const handleNewMessage = useCallback((message) => {
+    if (message.chat_id === selectedChat?.id) {
+      setMessages((prev) => [...prev, message]);
+      scrollToBottom();
+    }
+  }, [selectedChat]);
 
-    // Подключаемся к WebSocket
-    const newSocket = io('http://localhost:8080', {
-      auth: {
-        token: localStorage.getItem('token'),
-      },
-    });
-
-    newSocket.on('message', handleNewMessage);
-    setSocket(newSocket);
-
-    return () => {
-      newSocket.disconnect();
-    };
+  const loadMessages = useCallback(async (chatId) => {
+    try {
+      const response = await axios.get(`/api/chat/${chatId}/messages`);
+      console.log('Полученные сообщения:', response.data);
+      setMessages(response.data);
+      scrollToBottom();
+    } catch (error) {
+      console.error('Error loading messages:', error);
+    }
   }, []);
 
+  // Polling для сообщений
   useEffect(() => {
     if (!selectedChat) return;
-    const interval = setInterval(() => {
-      loadMessages(selectedChat.id);
-    }, 2000); // каждые 2 секунды
+
+    // Функция для загрузки сообщений
+    const fetchMessages = async () => {
+      await loadMessages(selectedChat.id);
+    };
+
+    // Сразу загружаем
+    fetchMessages();
+
+    // Запускаем polling
+    const interval = setInterval(fetchMessages, 3000); // каждые 3 секунды
+
+    // Очищаем при смене чата или размонтировании
     return () => clearInterval(interval);
-  }, [selectedChat]);
+  }, [selectedChat, loadMessages]);
 
   const loadChats = async () => {
     try {
@@ -84,22 +97,12 @@ function Chat() {
     }
   };
 
-  const loadMessages = async (chatId) => {
-    try {
-      const response = await axios.get(`/api/chat/${chatId}/messages`);
-      setMessages(response.data);
-      scrollToBottom();
-    } catch (error) {
-      console.error('Error loading messages:', error);
-    }
-  };
-
-  const handleNewMessage = (message) => {
-    if (message.chat_id === selectedChat?.id) {
-      setMessages((prev) => [...prev, message]);
-      scrollToBottom();
-    }
-  };
+  // Polling для списка чатов
+  useEffect(() => {
+    loadChats();
+    const interval = setInterval(loadChats, 5000); // каждые 5 секунд
+    return () => clearInterval(interval);
+  }, []);
 
   const scrollToBottom = () => {
     if (messagesEndRef.current) {
@@ -110,14 +113,18 @@ function Chat() {
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedChat) return;
 
+    const messageToSend = newMessage; // сохраняем текст сообщения
+    setNewMessage(''); // очищаем поле сразу
+
     try {
       await axios.post(`/api/chat/${selectedChat.id}/send`, {
-        content: newMessage,
+        content: messageToSend,
         chat_id: selectedChat.id,
       });
-      setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
+      // Если хотите, можно вернуть текст обратно в поле при ошибке:
+      setNewMessage(messageToSend);
     }
   };
 
@@ -166,15 +173,17 @@ function Chat() {
     const files = event.target.files;
     if (!files.length || !selectedChat) return;
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const formData = new FormData();
-      formData.append('file', file);
-      try {
-        // Сначала создаем альбом
-        const albumResponse = await axios.post('/api/media/albums');
-        const albumId = albumResponse.data.id;
-        // Загружаем файл в альбом
+    let albumId = null;
+    try {
+      // Создаём альбом только один раз
+      const albumResponse = await axios.post('/api/media/albums');
+      albumId = albumResponse.data.id;
+
+      // Загружаем все файлы в этот альбом
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const formData = new FormData();
+        formData.append('file', file);
         await axios.post(
           `/api/media/upload/${albumId}`,
           formData,
@@ -184,18 +193,20 @@ function Chat() {
             },
           }
         );
-        // Отправляем сообщение с медиа
-        const messageData = {
-          content: 'Медиа-сообщение',
-          chat_id: selectedChat.id,
-          album_id: albumId
-        };
-        await axios.post(`/api/chat/${selectedChat.id}/send`, messageData);
-      } catch (error) {
-        console.error('Error uploading file:', error);
-        if (error.response) {
-          console.error('Error response:', error.response.data);
-        }
+      }
+
+      // Отправляем сообщение с медиа
+      const messageData = {
+        content: 'Медиа-сообщение',
+        chat_id: selectedChat.id,
+        album_id: albumId
+      };
+      await axios.post(`/api/chat/${selectedChat.id}/send`, messageData);
+
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      if (error.response) {
+        console.error('Error response:', error.response.data);
       }
     }
     setSelectedFile(null);
@@ -249,40 +260,165 @@ function Chat() {
     }
   };
 
+  const Message = ({ message, isOwn }) => {
+    console.log('message:', message);
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: isOwn ? 'flex-end' : 'flex-start',
+          mb: 2,
+        }}
+      >
+        {!isOwn && (
+          <Typography
+            variant="caption"
+            sx={{
+              color: 'text.secondary',
+              mb: 0.5,
+              ml: 1,
+            }}
+          >
+            {message.sender_name}
+          </Typography>
+        )}
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: isOwn ? 'flex-end' : 'flex-start',
+            maxWidth: '70%',
+          }}
+        >
+          {Array.isArray(message.media_paths) && message.media_paths.length > 0 && (
+            <Box
+              sx={{
+                mb: 1,
+                borderRadius: 2,
+                overflow: 'hidden',
+                maxWidth: '100%',
+                display: 'flex',
+                gap: 1,
+                flexWrap: 'wrap',
+                '& img': {
+                  maxWidth: 120,
+                  maxHeight: 120,
+                  borderRadius: 2,
+                  cursor: 'pointer',
+                  transition: 'transform 0.2s',
+                  '&:hover': {
+                    transform: 'scale(1.02)',
+                  },
+                },
+              }}
+            >
+              {message.media_paths.map((imgPath, idx) => (
+                <img
+                  key={idx}
+                  src={`http://localhost:8080${imgPath}`}
+                  alt={`Медиа ${idx + 1}`}
+                  onClick={() => window.open(`http://localhost:8080${imgPath}`, '_blank')}
+                  onError={e => { e.target.style.display = 'none'; }}
+                />
+              ))}
+            </Box>
+          )}
+          <Paper
+            elevation={1}
+            sx={(theme) => ({
+              p: 1.5,
+              backgroundColor: isOwn ? theme.palette.primary.main : theme.palette.background.paper,
+              color: isOwn ? 'white' : theme.palette.text.primary,
+              borderRadius: 2,
+              position: 'relative',
+              '&::before': {
+                content: '""',
+                position: 'absolute',
+                top: '50%',
+                [isOwn ? 'right' : 'left']: -8,
+                transform: 'translateY(-50%)',
+                borderStyle: 'solid',
+                borderWidth: '8px 8px 8px 0',
+                borderColor: isOwn
+                  ? `transparent transparent transparent ${theme.palette.primary.main}`
+                  : `transparent ${theme.palette.background.paper} transparent transparent`,
+              },
+            })}
+          >
+            <Typography variant="body1">{message.content}</Typography>
+          </Paper>
+          <Typography
+            variant="caption"
+            sx={{
+              color: 'text.secondary',
+              mt: 0.5,
+              ml: isOwn ? 0 : 1,
+              mr: isOwn ? 1 : 0,
+            }}
+          >
+            {new Date(message.sended_at).toLocaleTimeString()}
+          </Typography>
+        </Box>
+      </Box>
+    );
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
   return (
-    <Box sx={{ display: 'flex', height: 'calc(100vh - 88px)' }}>
+    <Box sx={{ display: 'flex', height: 'calc(100vh - 64px)' }}>
       {/* Список чатов */}
       <Paper
         sx={{
           width: 300,
-          overflow: 'auto',
-          borderRight: '1px solid rgba(255, 255, 255, 0.12)',
+          borderRight: '1px solid',
+          borderColor: 'divider',
+          display: { xs: selectedChat ? 'none' : 'block', sm: 'block' },
         }}
       >
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between' }}>
+        <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography variant="h6">Чаты</Typography>
-          <IconButton onClick={() => setOpenNewChat(true)}>
+          <Tooltip title="Новый чат">
+            <IconButton onClick={() => setOpenNewChat(true)} color="primary">
             <AddIcon />
           </IconButton>
+          </Tooltip>
         </Box>
         <Divider />
-        <List>
+        <List sx={{ overflow: 'auto', maxHeight: 'calc(100vh - 120px)' }}>
           {chats.map((chat) => (
             <ListItem
               button
               key={chat.id}
               selected={selectedChat?.id === chat.id}
-              onClick={() => {
-                setSelectedChat(chat);
-                loadMessages(chat.id);
+              onClick={() => setSelectedChat(chat)}
+              sx={{
+                '&.Mui-selected': {
+                  backgroundColor: 'primary.main',
+                  '&:hover': {
+                    backgroundColor: 'primary.dark',
+                  },
+                },
+                transition: 'all 0.2s',
+                '&:hover': {
+                  backgroundColor: 'action.hover',
+                },
               }}
             >
               <ListItemAvatar>
-                <Avatar>{chat.name?.[0]?.toUpperCase() || 'C'}</Avatar>
+                <Avatar>
+                  {chat.is_group ? <GroupIcon /> : chat.name?.[0]?.toUpperCase()}
+                </Avatar>
               </ListItemAvatar>
               <ListItemText
-                primary={chat.name || 'Без названия'}
+                primary={chat.name}
                 secondary={chat.is_group ? 'Групповой чат' : 'Личный чат'}
+                primaryTypographyProps={{
+                  fontWeight: selectedChat?.id === chat.id ? 'bold' : 'normal',
+                }}
               />
             </ListItem>
           ))}
@@ -290,17 +426,52 @@ function Chat() {
       </Paper>
 
       {/* Область сообщений */}
-      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+      <Box
+        sx={{
+          flexGrow: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+        }}
+      >
         {selectedChat ? (
           <>
-            <Paper sx={{ p: 2 }}>
-              <Typography variant="h6">
-                {selectedChat.name || 'Без названия'}
+            {/* Заголовок чата */}
+            <Paper
+              sx={{
+                p: 2,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Avatar sx={{ mr: 2 }}>
+                  {selectedChat.is_group ? (
+                    <GroupIcon />
+                  ) : (
+                    selectedChat.name?.[0]?.toUpperCase()
+                  )}
+                </Avatar>
+                <Box>
+                  <Typography variant="h6">{selectedChat.name}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    {selectedChat.is_group ? 'Групповой чат' : 'Личный чат'}
               </Typography>
-              <IconButton onClick={() => setOpenInvite(true)} title="Пригласить пользователя">
+                </Box>
+              </Box>
+              {selectedChat.is_group && (
+                <Tooltip title="Пригласить пользователей">
+                  <IconButton onClick={() => setOpenInvite(true)} color="primary">
                 <PersonAddIcon />
               </IconButton>
+                </Tooltip>
+              )}
             </Paper>
+
+            {/* Сообщения */}
             <Box
               sx={{
                 flexGrow: 1,
@@ -308,49 +479,30 @@ function Chat() {
                 p: 2,
                 display: 'flex',
                 flexDirection: 'column',
+                gap: 2,
               }}
             >
               {messages.map((message) => (
-                <Box
-                  key={message.id}
-                  sx={{
-                    display: 'flex',
-                    justifyContent:
-                      message.sender_id === user.id ? 'flex-end' : 'flex-start',
-                    mb: 2,
-                  }}
-                >
-                  <Paper
-                    sx={{
-                      p: 2,
-                      maxWidth: '70%',
-                      backgroundColor:
-                        message.sender_id === user.id
-                          ? 'primary.main'
-                          : 'background.paper',
-                    }}
-                  >
-                    <Typography variant="subtitle2" color="text.secondary">
-                      {message.sender_name}
-                    </Typography>
-                    <Typography>{message.content}</Typography>
-                    {message.media_path && (
-                      <Box sx={{ mt: 1 }}>
-                        <img
-                          src={`http://localhost:8080${message.media_path}`}
-                          alt="media"
-                          style={{ maxWidth: '200px', borderRadius: 8 }}
-                        />
-                      </Box>
-                    )}
-                  </Paper>
-                </Box>
+                <Fade in={true} key={message.id}>
+                  <div>
+                    <Message message={message} isOwn={message.sender_id === user.id} />
+                  </div>
+                </Fade>
               ))}
               <div ref={messagesEndRef} />
             </Box>
-            <Paper sx={{ p: 2 }}>
-              <Box sx={{ display: 'flex', gap: 1 }}>
-                <IconButton component="label">
+
+            {/* Поле ввода */}
+            <Paper
+              sx={{
+                p: 2,
+                borderTop: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                <Tooltip title="Прикрепить файл">
+                  <IconButton component="label" color="primary">
                   <input
                     type="file"
                     hidden
@@ -359,13 +511,22 @@ function Chat() {
                   />
                   <AttachFileIcon />
                 </IconButton>
+                </Tooltip>
                 {selectedFile && (
-                  <Box sx={{ mt: 1 }}>
-                    <img
-                      src={URL.createObjectURL(selectedFile)}
-                      alt="preview"
-                      style={{ maxWidth: '200px', borderRadius: 8 }}
-                    />
+                  <Box
+                    sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      p: 1,
+                      borderRadius: 1,
+                      backgroundColor: 'action.hover',
+                    }}
+                  >
+                    <ImageIcon color="primary" />
+                    <Typography variant="body2" noWrap>
+                      {selectedFile.name}
+                    </Typography>
                   </Box>
                 )}
                 <TextField
@@ -375,17 +536,28 @@ function Chat() {
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
                   onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
                       handleSendMessage();
                     }
                   }}
+                  multiline
+                  maxRows={4}
+                  sx={{
+                    '& .MuiOutlinedInput-root': {
+                      borderRadius: 2,
+                    },
+                  }}
                 />
+                <Tooltip title="Отправить">
                 <IconButton
                   color="primary"
                   onClick={handleSendMessage}
+                    disabled={!newMessage.trim() && !selectedFile}
                 >
                   <SendIcon />
                 </IconButton>
+                </Tooltip>
               </Box>
             </Paper>
           </>
@@ -396,16 +568,25 @@ function Chat() {
               alignItems: 'center',
               justifyContent: 'center',
               height: '100%',
+              flexDirection: 'column',
+              gap: 2,
             }}
           >
             <Typography variant="h6" color="text.secondary">
               Выберите чат для начала общения
             </Typography>
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={() => setOpenNewChat(true)}
+            >
+              Создать новый чат
+            </Button>
           </Box>
         )}
       </Box>
 
-      {/* Диалог создания нового чата */}
+      {/* Диалоги */}
       <Dialog open={openNewChat} onClose={() => setOpenNewChat(false)}>
         <DialogTitle>Создать новый чат</DialogTitle>
         <DialogContent>
@@ -460,7 +641,6 @@ function Chat() {
         </DialogActions>
       </Dialog>
 
-      {/* Диалог приглашения пользователей */}
       <Dialog open={openInvite} onClose={() => setOpenInvite(false)}>
         <DialogTitle>Пригласить пользователя</DialogTitle>
         <DialogContent>

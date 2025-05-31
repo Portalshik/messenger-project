@@ -49,13 +49,13 @@ export const AuthProvider = ({ children }) => {
     return response.data;
   };
 
-  const register = async (username, password, confirmPassword, fullName) => {
+  const register = async (username, password, confirmPassword, email) => {
     try {
       const response = await axios.post('/api/registration', {
         username,
         password,
         confirm_password: confirmPassword,
-        full_name: fullName
+        email
       });
       return response.data;
     } catch (error) {

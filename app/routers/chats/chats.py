@@ -7,12 +7,14 @@ from datetime import datetime
 from sqlalchemy import select
 import logging
 import os
+import jwt
 
 from utils.db import get_db
 from utils.models import RelUsersToChat, Chat, Message, User, Media, Album
 from utils.auth import oauth2_scheme
 from utils.schemas import MessageCreate, MessageResponse, ChatCreate, ChatResponse
 from utils.auth import get_current_user
+from utils.cfg import SECRET_KEY, ALGORITHM
 
 # Создаём директорию для логов, если её нет
 os.makedirs("logs", exist_ok=True)
@@ -26,8 +28,6 @@ logger = logging.getLogger(__name__)
 
 chats_router = APIRouter()
 
-# Хранилище активных WebSocket соединений
-active_connections: dict[int, WebSocket] = {}
 
 @chats_router.get('/list', response_model=List[ChatResponse])
 async def get_chats(
@@ -49,7 +49,8 @@ async def get_chats(
                 select(RelUsersToChat).where(RelUsersToChat.chat_id == chat.id)
             )
             rels = rels_result.scalars().all()
-            user_ids = [rel.user_id for rel in rels if rel.user_id != current_user.id]
+            user_ids = [
+                rel.user_id for rel in rels if rel.user_id != current_user.id]
             if user_ids:
                 user_result = await db.execute(select(User).where(User.id == user_ids[0]))
                 other_user = user_result.scalar_one_or_none()
@@ -57,6 +58,7 @@ async def get_chats(
                     chat_dict['name'] = other_user.full_name or other_user.username
         response.append(chat_dict)
     return response
+
 
 @chats_router.post("/create", response_model=ChatResponse)
 async def create_chat(
@@ -72,13 +74,14 @@ async def create_chat(
     db.add(db_chat)
     await db.commit()
     await db.refresh(db_chat)
-    
+
     # Добавляем создателя в чат
     rel = RelUsersToChat(user_id=current_user.id, chat_id=db_chat.id)
     db.add(rel)
     await db.commit()
-    
+
     return db_chat
+
 
 @chats_router.post("/{chat_id}/add_user/{user_id}")
 async def add_user_to_chat(
@@ -92,13 +95,17 @@ async def add_user_to_chat(
     if not chat:
         raise HTTPException(status_code=404, detail="Чат не найден")
     if chat.admin_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Только администратор может добавлять пользователей")
+        raise HTTPException(
+            status_code=403,
+            detail="Только администратор может добавлять пользователей")
     if not chat.is_group:
         # Проверяем, сколько уже участников
         result = await db.execute(select(RelUsersToChat).where(RelUsersToChat.chat_id == chat_id))
         users_in_chat = result.scalars().all()
         if len(users_in_chat) >= 2:
-            raise HTTPException(status_code=400, detail="В личном чате может быть только 2 участника")
+            raise HTTPException(
+                status_code=400,
+                detail="В личном чате может быть только 2 участника")
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
@@ -108,6 +115,7 @@ async def add_user_to_chat(
     await db.commit()
     return {"message": "Пользователь успешно добавлен в чат"}
 
+
 @chats_router.post("/{chat_id}/send", response_model=MessageResponse)
 async def send_message(
     chat_id: int,
@@ -115,22 +123,27 @@ async def send_message(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    logger.info(f"Received message: content={message.content}, album_id={message.album_id}")
-    
+    logger.info(
+        f"Received message: content={
+            message.content}, album_id={
+            message.album_id}")
+
     result = await db.execute(select(Chat).where(Chat.id == chat_id))
     chat = result.scalar_one_or_none()
     if not chat:
         raise HTTPException(status_code=404, detail="Чат не найден")
-    
+
     result = await db.execute(select(RelUsersToChat).where(
         RelUsersToChat.chat_id == chat_id,
         RelUsersToChat.user_id == current_user.id
     ))
     rel = result.scalar_one_or_none()
     if not rel:
-        raise HTTPException(status_code=403, detail="У вас нет доступа к этому чату")
-    
+        raise HTTPException(status_code=403,
+                            detail="У вас нет доступа к этому чату")
+
     # Проверяем существование альбома и медиа
+    media_paths = []
     if message.album_id:
         logger.info(f"Checking album {message.album_id}")
         album_result = await db.execute(select(Album).where(Album.id == message.album_id))
@@ -138,14 +151,18 @@ async def send_message(
         if not album:
             logger.error(f"Album {message.album_id} not found")
             raise HTTPException(status_code=404, detail="Альбом не найден")
-        
+
         media_result = await db.execute(select(Media).where(Media.album_id == message.album_id))
-        media = media_result.scalar_one_or_none()
-        if not media:
+        media_list = media_result.scalars().all()
+        if not media_list:
             logger.error(f"No media found in album {message.album_id}")
-            raise HTTPException(status_code=404, detail="Медиа не найдено в альбоме")
-        logger.info(f"Found media in album: {media.path}")
-    
+            raise HTTPException(
+                status_code=404,
+                detail="Медиа не найдено в альбоме")
+        logger.info(f"Found {len(media_list)} media in album")
+        media_paths = [
+            f"/uploads/{media.filename.replace('\\', '/')}" for media in media_list]
+
     try:
         db_message = Message(
             content=message.content,
@@ -158,11 +175,42 @@ async def send_message(
         await db.commit()
         await db.refresh(db_message)
         logger.info(f"Message saved with album_id: {db_message.album_id}")
-        return db_message
+
+        # Получаем всех пользователей в чате
+        result = await db.execute(select(RelUsersToChat).where(RelUsersToChat.chat_id == chat_id))
+        chat_users = result.scalars().all()
+
+        # Получаем информацию о медиа и отправителе
+        sender_result = await db.execute(select(User).where(User.id == db_message.sender_id))
+        sender = sender_result.scalar_one_or_none()
+        sender_name = sender.username if sender else "Unknown"
+
+        # Формируем сообщение для отправки
+        message_data = {
+            **db_message.__dict__,
+            "media_paths": media_paths,
+            "sender_name": sender_name
+        }
+
+        # Отправляем сообщение всем пользователям в чате
+        for chat_user in chat_users:
+            if chat_user.user_id in active_connections:
+                try:
+                    await active_connections[chat_user.user_id].send_json(message_data)
+                except Exception as e:
+                    logger.error(
+                        f"Error sending message to user {
+                            chat_user.user_id}: {
+                            str(e)}")
+
+        return message_data
     except Exception as e:
         logger.error(f"Error saving message: {str(e)}")
         await db.rollback()
-        raise HTTPException(status_code=500, detail=f"Ошибка при сохранении сообщения: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка при сохранении сообщения: {str(e)}")
+
 
 @chats_router.get("/{chat_id}/messages", response_model=List[MessageResponse])
 async def get_messages(
@@ -176,38 +224,29 @@ async def get_messages(
     ))
     rel = result.scalar_one_or_none()
     if not rel:
-        raise HTTPException(status_code=403, detail="У вас нет доступа к этому чату")
+        raise HTTPException(status_code=403,
+                            detail="У вас нет доступа к этому чату")
     result = await db.execute(select(Message).where(
         Message.chat_id == chat_id
     ).order_by(Message.sended_at))
     messages = result.scalars().all()
     response = []
     for msg in messages:
-        media_path = None
+        media_paths = []
         if msg.album_id:
             media_result = await db.execute(select(Media).where(Media.album_id == msg.album_id))
-            media_obj = media_result.scalar_one_or_none()
-            if media_obj:
-                # Формируем корректный путь для фронта
-                media_path = f"/uploads/{media_obj.filename.replace('\\', '/')}"
+            media_list = media_result.scalars().all()
+            media_paths = [
+                f"/uploads/{media.filename.replace('\\', '/')}" for media in media_list]
+        print(f"msg.id={msg.id}, album_id={msg.album_id}")
+        print(f"media_paths: {media_paths}")
         # Получаем имя отправителя
         sender_result = await db.execute(select(User).where(User.id == msg.sender_id))
         sender = sender_result.scalar_one_or_none()
-        sender_name = sender.full_name or sender.username if sender else "Unknown"
+        sender_name = sender.username if sender else "Unknown"
         response.append({
             **msg.__dict__,
-            "media_path": media_path,
+            "media_paths": media_paths,
             "sender_name": sender_name
         })
     return response
-
-@chats_router.websocket("/ws/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: int, db: AsyncSession = Depends(get_db)):
-    await websocket.accept()
-    active_connections[user_id] = websocket
-    try:
-        while True:
-            data = await websocket.receive_text()
-            # Здесь можно добавить обработку входящих сообщений через WebSocket
-    except WebSocketDisconnect:
-        del active_connections[user_id]
