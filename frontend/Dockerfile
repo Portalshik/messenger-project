@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:17
 
 WORKDIR /frontend
 
@@ -7,6 +7,6 @@ RUN npm install
 
 COPY . .
 
-EXPOSE 3000
 
+RUN export NODE_OPTIONS=--openssl-legacy-provider
 CMD ["npm", "start"] 
