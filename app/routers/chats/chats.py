@@ -55,7 +55,7 @@ async def get_chats(
                 user_result = await db.execute(select(User).where(User.id == user_ids[0]))
                 other_user = user_result.scalar_one_or_none()
                 if other_user:
-                    chat_dict['name'] = other_user.full_name or other_user.username
+                    chat_dict['name'] = other_user.email or other_user.username
         response.append(chat_dict)
     return response
 
