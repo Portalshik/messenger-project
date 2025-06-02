@@ -40,6 +40,10 @@ app.add_middleware(
 # Создаем директорию для загрузок, если её нет
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
+# Монтируем папку static для стилей sqladmin
+os.makedirs("static", exist_ok=True)
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 @app.get("/uploads/{filename:path}")
 async def get_upload(filename: str):
