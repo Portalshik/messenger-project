@@ -13,6 +13,7 @@ from admin import init_admin
 from urllib.parse import unquote
 from dotenv import load_dotenv
 import json
+import sqladmin
 
 # Загружаем переменные окружения
 load_dotenv()
@@ -26,7 +27,7 @@ init_admin(app)
 CORS_ORIGINS = json.loads(
     os.getenv(
         "CORS_ORIGINS",
-        '["http://localhost:3000"]'))
+        '["https://messenger-project-eight.vercel.app"]'))
 
 # Настройка CORS
 app.add_middleware(
@@ -40,9 +41,14 @@ app.add_middleware(
 # Создаем директорию для загрузок, если её нет
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
-# Монтируем папку static для стилей sqladmin
-os.makedirs("static", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Принудительно монтируем статику sqladmin
+sqladmin_static_path = os.path.join(
+    os.path.dirname(sqladmin.__file__), "static")
+app.mount(
+    "/static/sqladmin",
+    StaticFiles(
+        directory=sqladmin_static_path),
+    name="sqladmin-static")
 
 
 @app.get("/uploads/{filename:path}")
