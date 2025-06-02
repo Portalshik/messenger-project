@@ -168,9 +168,9 @@ async def send_message(
     db: AsyncSession = Depends(get_db)
 ):
     logger.info(
-        f"Received message: content={
+        f"""Received message: content={
             message.content}, album_id={
-            message.album_id}")
+            message.album_id}""")
 
     result = await db.execute(select(Chat).where(Chat.id == chat_id))
     chat = result.scalar_one_or_none()
@@ -245,13 +245,14 @@ async def send_message(
                     await active_connections[chat_user.user_id].send_json(message_data)
                 except Exception as e:
                     logger.error(
-                        f"Error sending message to user {
+                        f"""Error sending message to user {
                             chat_user.user_id}: {
-                            str(e)}")
+                            str(e)}""")
 
         return message_data
     except Exception as e:
-        logger.error(f"Error saving message: {str(e)}")
+        logger.error(f"""Error saving message: {
+            str(e)}""")
         await db.rollback()
         raise HTTPException(
             status_code=500,

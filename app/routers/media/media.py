@@ -34,17 +34,18 @@ async def create_album(
         await db.commit()
         await db.refresh(album)
         logger.info(
-            f"Created album with ID: {
+            f"""Created album with ID: {
                 album.id} for user {
-                current_user.id}")
+                current_user.id}""")
         return album
     except Exception as e:
-        logger.error(f"Error creating album: {str(e)}")
+        logger.error(f"""Error creating album: {
+            str(e)}""")
         await db.rollback()
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка при создании альбома: {
-                str(e)}")
+            detail=f"""Ошибка при создании альбома: {
+                str(e)}""")
 
 
 @media_router.get("/albums", response_model=List[AlbumSchema])
@@ -74,8 +75,8 @@ async def upload_media(
             raise HTTPException(status_code=404, detail="Альбом не найден")
         if album.owner_id != current_user.id:
             logger.error(
-                f"User {
-                    current_user.id} has no access to album {album_id}")
+                f"""User {
+                    current_user.id} has no access to album {album_id}""")
             raise HTTPException(
                 status_code=403,
                 detail="Нет доступа к этому альбому")
@@ -107,8 +108,8 @@ async def upload_media(
             logger.error(f"Error saving file: {str(e)}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Ошибка при сохранении файла: {
-                    str(e)}")
+                detail=f"""Ошибка при сохранении файла: {
+                    str(e)}""")
 
         # Создаем запись в базе данных
         media = Media(
@@ -122,16 +123,16 @@ async def upload_media(
         await db.commit()
         await db.refresh(media)
         logger.info(
-            f"Media record created with ID: {
-                media.id} in album {album_id}")
+            f"""Media record created with ID: {
+                media.id} in album {album_id}""")
         return media
     except Exception as e:
         logger.error(f"Error in upload_media: {str(e)}")
         await db.rollback()
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка при загрузке медиа: {
-                str(e)}")
+            detail=f"""Ошибка при загрузке медиа: {
+                str(e)}""")
 
 
 @media_router.get("/album/{album_id}", response_model=List[MediaResponse])
@@ -175,8 +176,8 @@ async def delete_media(
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Ошибка при удалении файла: {
-                str(e)}")
+            detail=f"""Ошибка при удалении файла: {
+                str(e)}""")
 
     # Удаляем запись из базы данных
     db.delete(media)

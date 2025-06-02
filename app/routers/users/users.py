@@ -121,10 +121,10 @@ async def update_profile(
 
         # Генерируем уникальное имя файла
         file_extension = os.path.splitext(avatar.filename)[1]
-        avatar_filename = f'user_{
+        avatar_filename = f'''user_{
             current_user.id}_{
             int(
-                datetime.now().timestamp())}{file_extension}'
+                datetime.now().timestamp())}{file_extension}'''
         avatar_path = os.path.join(avatar_dir, avatar_filename)
 
         # Сохраняем файл
