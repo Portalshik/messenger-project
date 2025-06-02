@@ -32,10 +32,10 @@ class User(Base):
         cascade='all, delete-orphan')
 
     def __repr__(self):
-        return f"<User(id={
+        return f"""<User(id={
             self.id}, username='{
             self.username}', email='{
-            self.email}')>"
+            self.email}')>"""
 
 
 class Album(Base):
@@ -55,7 +55,9 @@ class Album(Base):
         cascade='all, delete-orphan')
 
     def __repr__(self):
-        return f"<Album(id={self.id}, owner_id={self.owner_id})>"
+        return f"""<Album(id={
+            self.id}, owner_id={
+            self.owner_id})>"""
 
 
 class Filetype(Base):
@@ -88,10 +90,10 @@ class Media(Base):
     album = relationship('Album', back_populates='media')
 
     def __repr__(self):
-        return f"<Media(id={
+        return f"""<Media(id={
             self.id}, filename='{
             self.filename}', filetype_id={
-            self.filetype_id})>"
+            self.filetype_id})>"""
 
 
 class Chat(Base):
@@ -112,10 +114,10 @@ class Chat(Base):
         cascade='all, delete-orphan')
 
     def __repr__(self):
-        return f"<Chat(id={
+        return f"""<Chat(id={
             self.id}, name='{
             self.name}', is_group={
-            self.is_group})>"
+            self.is_group})>"""
 
 
 class Message(Base):
@@ -132,10 +134,10 @@ class Message(Base):
     album = relationship('Album', back_populates='messages')
 
     def __repr__(self):
-        return f"<Message(id={
+        return f"""<Message(id={
             self.id}, chat_id={
             self.chat_id}, sender_id={
-            self.sender_id})>"
+            self.sender_id})>"""
 
 
 class RelUsersToChat(Base):
@@ -157,6 +159,6 @@ class RelUsersToChat(Base):
     chat = relationship('Chat', back_populates='users')
 
     def __repr__(self):
-        return f"<RelUsersToChat(user_id={
+        return f"""<RelUsersToChat(user_id={
             self.user_id}, chat_id={
-            self.chat_id})>"
+            self.chat_id})>"""
