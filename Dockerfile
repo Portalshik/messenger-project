@@ -10,7 +10,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Копируем остальные файлы из директории app
 COPY app/ .
 
-ENV PORT=8080
-EXPOSE $PORT
+EXPOSE 8080
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "$PORT"] 
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"] 
