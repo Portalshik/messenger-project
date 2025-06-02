@@ -24,7 +24,7 @@ app = FastAPI()
 app.mount(
     "/admin/statics",
     StaticFiles(
-        directory="sqladmin/statics"),
+        directory="SQLADMIN/statics"),
     name="admin_statics")
 
 # Инициализация административной панели
