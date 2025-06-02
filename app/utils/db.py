@@ -6,7 +6,8 @@ from sqlalchemy.ext.declarative import declarative_base
 Base = declarative_base()
 
 engine = create_async_engine(
-    'postgresql+asyncpg://postgres:postgres@localhost/messenger', echo=True)
+    'postgresql://postgres:axXUndVoMxlGMbvTkenrNSWvSAWejemS@metro.proxy.rlwy.net:49439/railway',
+    echo=True)
 
 async_session = sessionmaker(
     engine,
