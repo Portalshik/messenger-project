@@ -1,236 +1,199 @@
 import React, { useState, useEffect } from 'react';
 import {
-  Box,
+  Container,
   Grid,
   Card,
   CardMedia,
   CardContent,
   Typography,
+  Box,
+  CircularProgress,
   IconButton,
-  Button,
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogActions,
+  useTheme,
+  useMediaQuery,
+  TextField,
+  InputAdornment,
 } from '@mui/material';
 import {
-  Delete as DeleteIcon,
-  Add as AddIcon,
-  CreateNewFolder as CreateAlbumIcon,
+  ZoomIn as ZoomInIcon,
+  Search as SearchIcon,
+  Close as CloseIcon,
 } from '@mui/icons-material';
-import axios from 'axios';
+import { api, API_URL } from '../contexts/AuthContext';
 
 function MediaGallery() {
-  const [albums, setAlbums] = useState([]);
-  const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [media, setMedia] = useState([]);
-  const [openNewAlbum, setOpenNewAlbum] = useState(false);
-  const [openUpload, setOpenUpload] = useState(false);
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
-    loadAlbums();
+    loadMedia();
   }, []);
 
-  const loadAlbums = async () => {
+  const loadMedia = async () => {
     try {
-      const response = await axios.get('/api/media/albums');
-      setAlbums(response.data);
-    } catch (error) {
-      console.error('Error loading albums:', error);
-    }
-  };
-
-  const loadAlbumMedia = async (albumId) => {
-    try {
-      const response = await axios.get(`/api/media/album/${albumId}`);
+      const response = await api.get('/api/media');
       setMedia(response.data);
+      setLoading(false);
     } catch (error) {
-      console.error('Error loading media:', error);
+      setError('Ошибка при загрузке медиафайлов');
+      setLoading(false);
     }
   };
 
-  const handleCreateAlbum = async () => {
-    try {
-      const response = await axios.post('/api/media/albums');
-      setAlbums((prev) => [...prev, response.data]);
-      setOpenNewAlbum(false);
-    } catch (error) {
-      console.error('Error creating album:', error);
-    }
+  const handleImageClick = (image) => {
+    setSelectedImage(image);
   };
 
-  const handleFileSelect = (event) => {
-    setSelectedFile(event.target.files[0]);
+  const handleCloseDialog = () => {
+    setSelectedImage(null);
   };
 
-  const handleUpload = async () => {
-    if (!selectedFile || !selectedAlbum) return;
+  const filteredMedia = media.filter((item) =>
+    item.filename.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-
-    try {
-      await axios.post(
-        `/api/media/upload/${selectedAlbum.id}`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-        }
-      );
-      loadAlbumMedia(selectedAlbum.id);
-      setOpenUpload(false);
-      setSelectedFile(null);
-    } catch (error) {
-      console.error('Error uploading file:', error);
-    }
-  };
-
-  const handleDeleteMedia = async (mediaId) => {
-    try {
-      await axios.delete(`/api/media/media/${mediaId}`);
-      setMedia((prev) => prev.filter((m) => m.id !== mediaId));
-    } catch (error) {
-      console.error('Error deleting media:', error);
-    }
-  };
+  if (loading) {
+    return (
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+        }}
+      >
+        <CircularProgress />
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-        <Typography variant="h5">Медиа-галерея</Typography>
-        <Box>
-          <Button
-            variant="contained"
-            startIcon={<CreateAlbumIcon />}
-            onClick={() => setOpenNewAlbum(true)}
-            sx={{ mr: 2 }}
-          >
-            Новый альбом
-          </Button>
-          {selectedAlbum && (
-            <Button
-              variant="contained"
-              startIcon={<AddIcon />}
-              onClick={() => setOpenUpload(true)}
-            >
-              Загрузить файл
-            </Button>
-          )}
-        </Box>
+    <Container maxWidth="lg" sx={{ py: 4 }}>
+      <Box sx={{ mb: 4 }}>
+        <TextField
+          fullWidth
+          variant="outlined"
+          placeholder="Поиск медиафайлов..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchIcon />
+              </InputAdornment>
+            ),
+          }}
+          size={isMobile ? "small" : "medium"}
+        />
       </Box>
 
-      <Grid container spacing={3}>
-        {/* Список альбомов */}
-        <Grid item xs={12} md={3}>
-          <Box sx={{ bgcolor: 'background.paper', p: 2, borderRadius: 1 }}>
-            <Typography variant="h6" sx={{ mb: 2 }}>
-              Альбомы
-            </Typography>
-            {albums.map((album) => (
-              <Button
-                key={album.id}
-                fullWidth
-                variant={selectedAlbum?.id === album.id ? 'contained' : 'text'}
-                onClick={() => {
-                  setSelectedAlbum(album);
-                  loadAlbumMedia(album.id);
-                }}
-                sx={{ mb: 1, justifyContent: 'flex-start' }}
-              >
-                Альбом {album.id}
-              </Button>
-            ))}
-          </Box>
-        </Grid>
+      {error && (
+        <Typography color="error" sx={{ mb: 2 }}>
+          {error}
+        </Typography>
+      )}
 
-        {/* Сетка медиа-файлов */}
-        <Grid item xs={12} md={9}>
-          {selectedAlbum ? (
-            <Grid container spacing={2}>
-              {media.map((item) => (
-                <Grid item xs={12} sm={6} md={4} key={item.id}>
-                  <Card>
-                    <CardMedia
-                      component="img"
-                      height="200"
-                      image={item.path}
-                      alt={item.filename}
-                    />
-                    <CardContent>
-                      <Typography variant="body2" color="text.secondary">
-                        {item.filename}
-                      </Typography>
-                      <IconButton
-                        color="error"
-                        onClick={() => handleDeleteMedia(item.id)}
-                        sx={{ float: 'right' }}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          ) : (
-            <Box
+      <Grid container spacing={2}>
+        {filteredMedia.map((item) => (
+          <Grid item xs={12} sm={6} md={4} lg={3} key={item.id}>
+            <Card
               sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
                 height: '100%',
-                minHeight: 400,
+                display: 'flex',
+                flexDirection: 'column',
+                transition: 'transform 0.2s',
+                '&:hover': {
+                  transform: 'scale(1.02)',
+                },
               }}
             >
-              <Typography variant="h6" color="text.secondary">
-                Выберите альбом для просмотра
-              </Typography>
-            </Box>
-          )}
-        </Grid>
+              <Box sx={{ position: 'relative', paddingTop: '100%' }}>
+                <CardMedia
+                  component="img"
+                  image={API_URL + item.path}
+                  alt={item.filename}
+                  sx={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                  }}
+                />
+                <IconButton
+                  sx={{
+                    position: 'absolute',
+                    top: 8,
+                    right: 8,
+                    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                    '&:hover': {
+                      backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    },
+                  }}
+                  onClick={() => handleImageClick(item)}
+                >
+                  <ZoomInIcon />
+                </IconButton>
+              </Box>
+              <CardContent>
+                <Typography variant="body2" noWrap>
+                  {item.filename}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {new Date(item.created_at).toLocaleDateString()}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+        ))}
       </Grid>
 
-      {/* Диалог создания нового альбома */}
-      <Dialog open={openNewAlbum} onClose={() => setOpenNewAlbum(false)}>
-        <DialogTitle>Создать новый альбом</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Новый альбом будет создан автоматически.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenNewAlbum(false)}>Отмена</Button>
-          <Button onClick={handleCreateAlbum} variant="contained">
-            Создать
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Диалог загрузки файла */}
-      <Dialog open={openUpload} onClose={() => setOpenUpload(false)}>
-        <DialogTitle>Загрузить файл</DialogTitle>
-        <DialogContent>
-          <input
-            type="file"
-            onChange={handleFileSelect}
-            style={{ marginTop: 16 }}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenUpload(false)}>Отмена</Button>
-          <Button
-            onClick={handleUpload}
-            variant="contained"
-            disabled={!selectedFile}
+      <Dialog
+        open={!!selectedImage}
+        onClose={handleCloseDialog}
+        maxWidth="lg"
+        fullWidth
+      >
+        <DialogContent sx={{ p: 0, position: 'relative' }}>
+          <IconButton
+            onClick={handleCloseDialog}
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              backgroundColor: 'rgba(255, 255, 255, 0.8)',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              },
+              zIndex: 1,
+            }}
           >
-            Загрузить
-          </Button>
-        </DialogActions>
+            <CloseIcon />
+          </IconButton>
+          {selectedImage && (
+            <Box
+              component="img"
+              src={API_URL + selectedImage.path}
+              alt={selectedImage.filename}
+              sx={{
+                width: '100%',
+                height: 'auto',
+                maxHeight: '90vh',
+                objectFit: 'contain',
+              }}
+            />
+          )}
+        </DialogContent>
       </Dialog>
-    </Box>
+    </Container>
   );
 }
 

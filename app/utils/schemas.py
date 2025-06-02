@@ -66,6 +66,7 @@ class MessageResponse(MessageBase):
     sended_at: datetime
     media_path: Optional[str] = None
     sender_name: Optional[str] = None
+    sender_avatar: Optional[str] = None
     media_paths: Optional[List[str]] = []
 
     class Config:
@@ -86,7 +87,7 @@ class MediaCreate(MediaBase):
 class MediaResponse(MediaBase):
     id: int
     path: str
-    uploaded_at: datetime
+    uploaded_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
@@ -107,6 +108,7 @@ class UserResponse(BaseModel):
     email: str
     active: bool
     created_at: Optional[datetime] = None
+    avatar: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -115,3 +117,4 @@ class UserResponse(BaseModel):
 class UserUpdate(BaseModel):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
+    avatar: Optional[str] = None

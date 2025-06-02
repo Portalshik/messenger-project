@@ -11,6 +11,7 @@ class User(Base):
     email = Column(String(100), unique=True, nullable=False)
     active = Column(Boolean, default=True)
     created_at = Column(TIMESTAMP(timezone=True))
+    avatar = Column(String(256), nullable=True)
 
     albums = relationship(
         'Album',
@@ -30,6 +31,12 @@ class User(Base):
         back_populates='user',
         cascade='all, delete-orphan')
 
+    def __repr__(self):
+        return f"<User(id={
+            self.id}, username='{
+            self.username}', email='{
+            self.email}')>"
+
 
 class Album(Base):
     __tablename__ = 'albums'
@@ -47,6 +54,9 @@ class Album(Base):
         back_populates='album',
         cascade='all, delete-orphan')
 
+    def __repr__(self):
+        return f"<Album(id={self.id}, owner_id={self.owner_id})>"
+
 
 class Filetype(Base):
     __tablename__ = 'filetypes'
@@ -56,6 +66,9 @@ class Filetype(Base):
         'Media',
         back_populates='filetype',
         cascade='all, delete-orphan')
+
+    def __repr__(self):
+        return f"<Filetype(id={self.id}, typename='{self.typename}')>"
 
 
 class Media(Base):
@@ -73,6 +86,12 @@ class Media(Base):
 
     filetype = relationship('Filetype', back_populates='media')
     album = relationship('Album', back_populates='media')
+
+    def __repr__(self):
+        return f"<Media(id={
+            self.id}, filename='{
+            self.filename}', filetype_id={
+            self.filetype_id})>"
 
 
 class Chat(Base):
@@ -92,6 +111,12 @@ class Chat(Base):
         back_populates='chat',
         cascade='all, delete-orphan')
 
+    def __repr__(self):
+        return f"<Chat(id={
+            self.id}, name='{
+            self.name}', is_group={
+            self.is_group})>"
+
 
 class Message(Base):
     __tablename__ = 'messages'
@@ -105,6 +130,12 @@ class Message(Base):
     chat = relationship('Chat', back_populates='messages')
     sender = relationship('User', back_populates='messages')
     album = relationship('Album', back_populates='messages')
+
+    def __repr__(self):
+        return f"<Message(id={
+            self.id}, chat_id={
+            self.chat_id}, sender_id={
+            self.sender_id})>"
 
 
 class RelUsersToChat(Base):
@@ -124,3 +155,8 @@ class RelUsersToChat(Base):
 
     user = relationship('User', back_populates='chats')
     chat = relationship('Chat', back_populates='users')
+
+    def __repr__(self):
+        return f"<RelUsersToChat(user_id={
+            self.user_id}, chat_id={
+            self.chat_id})>"

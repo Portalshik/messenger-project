@@ -2,12 +2,13 @@ from fastapi import Request, Depends, HTTPException, WebSocket, WebSocketDisconn
 from fastapi.routing import APIRouter
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 from sqlalchemy import select
 import logging
 import os
 import jwt
+from pydantic import BaseModel
 
 from utils.db import get_db
 from utils.models import RelUsersToChat, Chat, Message, User, Media, Album
@@ -29,6 +30,21 @@ logger = logging.getLogger(__name__)
 chats_router = APIRouter()
 
 
+class UserInfo(BaseModel):
+    id: int
+    username: str
+    email: str
+    avatar: Optional[str] = None
+
+
+class ChatResponse(BaseModel):
+    id: int
+    name: str
+    is_group: bool
+    admin_id: int
+    participants: List[UserInfo]
+
+
 @chats_router.get('/list', response_model=List[ChatResponse])
 async def get_chats(
     request: Request,
@@ -43,7 +59,14 @@ async def get_chats(
     chats = result.scalars().all()
     response = []
     for chat in chats:
-        chat_dict = chat.__dict__.copy()
+        chat_dict = {
+            'id': chat.id,
+            'name': chat.name,
+            'is_group': chat.is_group,
+            'admin_id': chat.admin_id,
+            'participants': []
+        }
+
         if not chat.is_group:
             rels_result = await db.execute(
                 select(RelUsersToChat).where(RelUsersToChat.chat_id == chat.id)
@@ -56,6 +79,27 @@ async def get_chats(
                 other_user = user_result.scalar_one_or_none()
                 if other_user:
                     chat_dict['name'] = other_user.email or other_user.username
+
+        # Получаем информацию об участниках чата
+        rels_result = await db.execute(
+            select(RelUsersToChat).where(RelUsersToChat.chat_id == chat.id)
+        )
+        rels = rels_result.scalars().all()
+        user_ids = [rel.user_id for rel in rels]
+        users_result = await db.execute(select(User).where(User.id.in_(user_ids)))
+        users = users_result.scalars().all()
+
+        # Формируем информацию об участниках
+        chat_dict['participants'] = [
+            {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'avatar': user.avatar
+            }
+            for user in users
+        ]
+
         response.append(chat_dict)
     return response
 
@@ -161,7 +205,7 @@ async def send_message(
                 detail="Медиа не найдено в альбоме")
         logger.info(f"Found {len(media_list)} media in album")
         media_paths = [
-            f"/uploads/{media.filename.replace('\\', '/')}" for media in media_list]
+            f"/uploads/{os.path.basename(media.path)}" for media in media_list]
 
     try:
         db_message = Message(
@@ -184,12 +228,14 @@ async def send_message(
         sender_result = await db.execute(select(User).where(User.id == db_message.sender_id))
         sender = sender_result.scalar_one_or_none()
         sender_name = sender.username if sender else "Unknown"
+        sender_avatar = sender.avatar if sender else None
 
         # Формируем сообщение для отправки
         message_data = {
             **db_message.__dict__,
             "media_paths": media_paths,
-            "sender_name": sender_name
+            "sender_name": sender_name,
+            "sender_avatar": sender_avatar
         }
 
         # Отправляем сообщение всем пользователям в чате
@@ -237,16 +283,69 @@ async def get_messages(
             media_result = await db.execute(select(Media).where(Media.album_id == msg.album_id))
             media_list = media_result.scalars().all()
             media_paths = [
-                f"/uploads/{media.filename.replace('\\', '/')}" for media in media_list]
+                f"/uploads/{os.path.basename(media.path)}" for media in media_list]
         print(f"msg.id={msg.id}, album_id={msg.album_id}")
         print(f"media_paths: {media_paths}")
         # Получаем имя отправителя
         sender_result = await db.execute(select(User).where(User.id == msg.sender_id))
         sender = sender_result.scalar_one_or_none()
         sender_name = sender.username if sender else "Unknown"
+        sender_avatar = sender.avatar if sender else None
         response.append({
             **msg.__dict__,
             "media_paths": media_paths,
-            "sender_name": sender_name
+            "sender_name": sender_name,
+            "sender_avatar": sender_avatar
         })
     return response
+
+
+@chats_router.get("/{chat_id}", response_model=ChatResponse)
+async def get_chat(
+    chat_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    # Проверяем доступ к чату
+    result = await db.execute(select(RelUsersToChat).where(
+        RelUsersToChat.chat_id == chat_id,
+        RelUsersToChat.user_id == current_user.id
+    ))
+    rel = result.scalar_one_or_none()
+    if not rel:
+        raise HTTPException(status_code=403,
+                            detail="У вас нет доступа к этому чату")
+
+    # Получаем информацию о чате
+    result = await db.execute(select(Chat).where(Chat.id == chat_id))
+    chat = result.scalar_one_or_none()
+    if not chat:
+        raise HTTPException(status_code=404, detail="Чат не найден")
+
+    # Получаем информацию об участниках чата
+    result = await db.execute(select(RelUsersToChat).where(RelUsersToChat.chat_id == chat_id))
+    participants = result.scalars().all()
+
+    # Получаем информацию о пользователях
+    user_ids = [p.user_id for p in participants]
+    result = await db.execute(select(User).where(User.id.in_(user_ids)))
+    users = result.scalars().all()
+
+    # Формируем ответ
+    chat_dict = {
+        'id': chat.id,
+        'name': chat.name,
+        'is_group': chat.is_group,
+        'admin_id': chat.admin_id,
+        'participants': [
+            {
+                'id': user.id,
+                'username': user.username,
+                'email': user.email,
+                'avatar': user.avatar
+            }
+            for user in users
+        ]
+    }
+
+    return chat_dict

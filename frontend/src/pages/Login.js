@@ -2,34 +2,34 @@ import React, { useState } from 'react';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import {
   Container,
-  Box,
   Paper,
   TextField,
   Button,
   Typography,
+  Box,
   Link,
   InputAdornment,
   IconButton,
-  Fade,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
-import {
-  Visibility,
-  VisibilityOff,
-  Email as EmailIcon,
-  Lock as LockIcon,
-} from '@mui/icons-material';
+import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 
 function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { login } = useAuth();
+  const [error, setError] = useState('');
   const navigate = useNavigate();
+  const { login } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
+
     try {
       await login(username, password);
       navigate('/');
@@ -39,164 +39,113 @@ function Login() {
   };
 
   return (
-    <Container component="main" maxWidth="xs">
-      <Fade in={true} timeout={1000}>
-      <Box
+    <Container
+      maxWidth="sm"
+      sx={{
+        height: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        py: { xs: 2, sm: 4 },
+      }}
+    >
+      <Paper
+        elevation={3}
         sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
+          p: { xs: 2, sm: 4 },
+          width: '100%',
+          maxWidth: 400,
+          mx: 'auto',
         }}
       >
-        <Paper
-          elevation={3}
+        <Box
+          component="form"
+          onSubmit={handleSubmit}
           sx={{
-            padding: 4,
             display: 'flex',
             flexDirection: 'column',
-            alignItems: 'center',
-            width: '100%',
-              background: 'rgba(30, 30, 30, 0.8)',
-              backdropFilter: 'blur(10px)',
-              borderRadius: 3,
+            gap: 2,
           }}
         >
-            <Typography
-              component="h1"
-              variant="h4"
-              sx={{
-                mb: 3,
-                fontWeight: 600,
-                background: 'linear-gradient(45deg, #7C4DFF 30%, #FF4081 90%)',
-                backgroundClip: 'text',
-                textFillColor: 'transparent',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
-              }}
-            >
-              Добро пожаловать
-          </Typography>
-          <Box
-            component="form"
-            onSubmit={handleSubmit}
-            sx={{ mt: 1, width: '100%' }}
+          <Typography
+            variant="h4"
+            component="h1"
+            align="center"
+            gutterBottom
+            sx={{
+              fontSize: { xs: '1.75rem', sm: '2rem' },
+              fontWeight: 500,
+            }}
           >
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="username"
-              label="Имя пользователя"
-              name="username"
-              autoComplete="username"
-              autoFocus
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <EmailIcon color="primary" />
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    '&:hover fieldset': {
-                      borderColor: 'primary.main',
-                    },
-                  },
-                }}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Пароль"
-                type={showPassword ? 'text' : 'password'}
-              id="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <LockIcon color="primary" />
-                    </InputAdornment>
-                  ),
-                  endAdornment: (
-                    <InputAdornment position="end">
-                      <IconButton
-                        onClick={() => setShowPassword(!showPassword)}
-                        edge="end"
-                      >
-                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                      </IconButton>
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    '&:hover fieldset': {
-                      borderColor: 'primary.main',
-                    },
-                  },
-                }}
-            />
-            {error && (
-                <Typography
-                  color="error"
-                  sx={{
-                    mt: 2,
-                    textAlign: 'center',
-                    animation: 'shake 0.5s',
-                    '@keyframes shake': {
-                      '0%, 100%': { transform: 'translateX(0)' },
-                      '25%': { transform: 'translateX(-5px)' },
-                      '75%': { transform: 'translateX(5px)' },
-                    },
-                  }}
-                >
-                {error}
-              </Typography>
-            )}
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-                sx={{
-                  mt: 3,
-                  mb: 2,
-                  height: 48,
-                  background: 'linear-gradient(45deg, #7C4DFF 30%, #FF4081 90%)',
-                  '&:hover': {
-                    background: 'linear-gradient(45deg, #6B3FE0 30%, #E63D73 90%)',
-                  },
-                }}
-            >
-              Войти
-            </Button>
-            <Box sx={{ textAlign: 'center' }}>
-                <Link
-                  component={RouterLink}
-                  to="/register"
-                  variant="body2"
-                  sx={{
-                    color: 'primary.light',
-                    textDecoration: 'none',
-                    '&:hover': {
-                      textDecoration: 'underline',
-                    },
-                  }}
-                >
-                Нет аккаунта? Зарегистрируйтесь
-              </Link>
-            </Box>
+            Вход в систему
+          </Typography>
+
+          {error && (
+            <Typography color="error" align="center" sx={{ mb: 1 }}>
+              {error}
+            </Typography>
+          )}
+
+          <TextField
+            label="Имя пользователя"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            fullWidth
+            autoFocus
+            size={isMobile ? "small" : "medium"}
+          />
+
+          <TextField
+            label="Пароль"
+            type={showPassword ? 'text' : 'password'}
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            fullWidth
+            size={isMobile ? "small" : "medium"}
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <IconButton
+                    onClick={() => setShowPassword(!showPassword)}
+                    edge="end"
+                  >
+                    {showPassword ? <VisibilityOff /> : <Visibility />}
+                  </IconButton>
+                </InputAdornment>
+              ),
+            }}
+          />
+
+          <Button
+            type="submit"
+            variant="contained"
+            fullWidth
+            size={isMobile ? "medium" : "large"}
+            sx={{ mt: 1 }}
+          >
+            Войти
+          </Button>
+
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: 1,
+              mt: 1,
+            }}
+          >
+            <Typography variant="body2" color="text.secondary">
+              Нет аккаунта?
+            </Typography>
+            <Link component={RouterLink} to="/register" underline="hover">
+              Зарегистрироваться
+            </Link>
           </Box>
-        </Paper>
-      </Box>
-      </Fade>
+        </Box>
+      </Paper>
     </Container>
   );
 }
