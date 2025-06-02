@@ -11,20 +11,27 @@ import os
 from utils.paths import UPLOADS_DIR
 from admin import init_admin
 from urllib.parse import unquote
+from dotenv import load_dotenv
+import json
+
+# Загружаем переменные окружения
+load_dotenv()
 
 app = FastAPI()
 
 # Инициализация административной панели
 init_admin(app)
 
+# Получаем список разрешенных origins из переменной окружения
+CORS_ORIGINS = json.loads(
+    os.getenv(
+        "CORS_ORIGINS",
+        '["http://localhost:3000"]'))
+
 # Настройка CORS
-# ВАЖНО: если фронтенд работает с другого адреса, добавь его сюда!
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://192.168.1.5:3000"
-    ],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
