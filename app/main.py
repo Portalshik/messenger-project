@@ -21,12 +21,10 @@ load_dotenv()
 app = FastAPI()
 
 # Явно монтируем статику SQLAdmin
-sqladmin_static_path = os.path.join(
-    os.path.dirname(sqladmin.__file__), "statics")
 app.mount(
     "/admin/statics",
     StaticFiles(
-        directory=sqladmin_static_path),
+        directory="sqladmin/statics"),
     name="admin_statics")
 
 # Инициализация административной панели
