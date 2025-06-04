@@ -152,7 +152,7 @@ function Chat() {
       scrollToBottom();
     } catch (error) {
       console.error('Error sending message:', error);
-      setNewMessage(messageToSend);
+      alert('Ошибка при отправке сообщения. Попробуйте ещё раз.');
     }
   };
 
