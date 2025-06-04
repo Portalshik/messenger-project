@@ -114,16 +114,40 @@ function Chat() {
   };
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || !selectedChat) return;
+    if ((!newMessage.trim() && !selectedFile) || !selectedChat) return;
 
     const messageToSend = newMessage;
     setNewMessage('');
 
     try {
-      const response = await api.post(`/api/chat/${selectedChat.id}/send`, {
-        content: messageToSend,
-        chat_id: selectedChat.id,
-      });
+      let response;
+      if (selectedFile) {
+        const albumResponse = await api.post('/api/media/albums');
+        const albumId = albumResponse.data.id;
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        await api.post(
+          `/api/media/upload/${albumId}`,
+          formData,
+          {
+            headers: {
+              'Content-Type': 'multipart/form-data',
+            },
+          }
+        );
+        const messageData = {
+          content: messageToSend || 'Медиа-сообщение',
+          chat_id: selectedChat.id,
+          album_id: albumId
+        };
+        response = await api.post(`/api/chat/${selectedChat.id}/send`, messageData);
+        setSelectedFile(null);
+      } else {
+        response = await api.post(`/api/chat/${selectedChat.id}/send`, {
+          content: messageToSend,
+          chat_id: selectedChat.id,
+        });
+      }
       setMessages(prev => [...prev, response.data]);
       scrollToBottom();
     } catch (error) {
