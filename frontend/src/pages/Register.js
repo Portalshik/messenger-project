@@ -20,7 +20,7 @@ function Register() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [fullName, setFullName] = useState('');
+  const [email, setEmail] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -38,7 +38,7 @@ function Register() {
     }
 
     try {
-      await register(username, password, fullName);
+      await register(username, password, email);
       navigate('/');
     } catch (err) {
       setError('Ошибка при регистрации. Возможно, пользователь уже существует.');
@@ -104,9 +104,10 @@ function Register() {
           />
 
           <TextField
-            label="Полное имя"
-            value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
+            label="Email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             required
             fullWidth
             size={isMobile ? "small" : "medium"}
