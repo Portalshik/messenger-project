@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from utils.db import get_db
 from utils.models import RelUsersToChat, Chat, Message, User, Media, Album
 from utils.auth import oauth2_scheme
-from utils.schemas import MessageCreate, MessageResponse, ChatCreate, ChatResponse
+from utils.schemas import MessageCreate, MessageResponse, ChatCreate, ChatResponse, UserInfo
 from utils.auth import get_current_user
 from utils.cfg import SECRET_KEY, ALGORITHM
 
@@ -28,21 +28,6 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 chats_router = APIRouter()
-
-
-class UserInfo(BaseModel):
-    id: int
-    username: str
-    email: str
-    avatar: Optional[str] = None
-
-
-class ChatResponse(BaseModel):
-    id: int
-    name: str
-    is_group: bool
-    admin_id: int
-    participants: List[UserInfo]
 
 
 @chats_router.get('/list', response_model=List[ChatResponse])
@@ -124,7 +109,27 @@ async def create_chat(
     db.add(rel)
     await db.commit()
 
-    return db_chat
+    # Получаем информацию о создателе чата
+    creator_result = await db.execute(select(User).where(User.id == current_user.id))
+    creator = creator_result.scalar_one_or_none()
+
+    # Формируем ответ
+    chat_dict = {
+        'id': db_chat.id,
+        'name': db_chat.name,
+        'is_group': db_chat.is_group,
+        'admin_id': db_chat.admin_id,
+        'participants': [
+            {
+                'id': creator.id,
+                'username': creator.username,
+                'email': creator.email,
+                'avatar': creator.avatar
+            }
+        ]
+    }
+
+    return chat_dict
 
 
 @chats_router.post("/{chat_id}/add_user/{user_id}")

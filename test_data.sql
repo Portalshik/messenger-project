@@ -4,6 +4,11 @@ DELETE FROM rel_users_to_chat;
 DELETE FROM chats;
 DELETE FROM users;
 
+-- Сброс последовательностей
+ALTER SEQUENCE users_id_seq RESTART WITH 1;
+ALTER SEQUENCE chats_id_seq RESTART WITH 1;
+ALTER SEQUENCE messages_id_seq RESTART WITH 1;
+
 -- Добавление тестовых пользователей
 INSERT INTO users (username, hashed_password, email, active, created_at, avatar) VALUES
 ('ivan_petrov', '$2b$12$WZ3QfS5i2KC7/g.kyph0A.uqPxihVP.cyYuLZlBM4Xjufch4ZnOvq', 'ivan@example.com', true, NOW(), 'https://i.pravatar.cc/150?img=1'),
@@ -19,10 +24,6 @@ INSERT INTO users (username, hashed_password, email, active, created_at, avatar)
 -- maria_kuznetsova: Maria2024!
 -- dmitry_sokolov: Dmitry2024!
 
--- Сброс последовательностей
-ALTER SEQUENCE users_id_seq RESTART WITH 1;
-ALTER SEQUENCE chats_id_seq RESTART WITH 1;
-ALTER SEQUENCE messages_id_seq RESTART WITH 1;
 
 -- Создание личных чатов
 INSERT INTO chats (name, is_group, admin_id) VALUES

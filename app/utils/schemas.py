@@ -41,9 +41,20 @@ class ChatCreate(ChatBase):
     pass
 
 
+class UserInfo(BaseModel):
+    id: int
+    username: str
+    email: str
+    avatar: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
 class ChatResponse(ChatBase):
     id: int
     admin_id: int
+    participants: List[UserInfo]
 
     class Config:
         from_attributes = True
